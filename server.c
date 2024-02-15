@@ -189,8 +189,11 @@ int create_sync_message(char *operation, sync_msg_t *sync_msg, int silent) {
                 routing_table = init_dll();
                 mac_list = init_dll();
                 return 0;
+            case 'Q':
+                return -5;
+
             default:
-                fprintf(stderr, "Invalid operation: unknown op code\n");
+                fprintf(stderr, "Invalid operation: unknown op code: %c\n", token[0]);
                 return -1;
         }
     }
@@ -377,13 +380,12 @@ int main() {
         refresh_fd_set(&readfds); /*Copy the entire monitored FDs to readfds*/
         
         printf("Please select from the following options:\n");
-        printf("1.CREATE <Destination IP> <Mask (0-32)> <Gateway IP> <OIF>\n");
-        printf("2.UPDATE <Destination IP> <Mask (0-32)> <New Gateway IP> <New OIF>\n");
-        printf("3.DELETE <Destination IP> <Mask (0-32)>\n");
-        printf("4.CREATE <MAC>\n");
-        printf("5.DELETE <MAC>\n");
-        printf("6.SHOW\n");
-        printf("7.FLUSH\n");
+        printf("C.CREATE <Destination IP> <Mask (0-32)> <Gateway IP> <OIF> | <MAC>\n");
+        printf("U.UPDATE <Destination IP> <Mask (0-32)> <New Gateway IP> <New OIF>\n");
+        printf("D.DELETE <Destination IP> <Mask (0-32)> | <MAC>\n");
+        printf("S.SHOW\n");
+        printf("F.FLUSH\n");
+        printf("Q.Quit\n");
         
         select(get_max_fd() + 1, &readfds, NULL, NULL, NULL);  /* Wait for incoming connections. */
 
@@ -418,7 +420,12 @@ int main() {
             }
             op[ret] = 0;
             
-            if (!create_sync_message(op, sync_msg, 0)) {
+            int nRc = create_sync_message(op, sync_msg, 0);
+
+            if (nRc == -5) {
+                break;
+            }
+            else if (nRc != 0) {
                 // update server's tables
                 if (sync_msg->l_code == L3) {
                     process_sync_mesg(routing_table, sync_msg);
